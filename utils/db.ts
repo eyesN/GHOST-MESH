@@ -76,6 +76,19 @@ export const mockSql = {
       return user as User;
   },
 
+  deleteUser: (username: string, password: string): boolean | { error: string } => {
+      const users = JSON.parse(localStorage.getItem(USERS_TABLE_KEY) || '{}');
+      const record = users[username];
+
+      if (!record) return { error: 'User not found' };
+      if (record.password !== password) return { error: 'Invalid credentials' };
+
+      delete users[username];
+      localStorage.setItem(USERS_TABLE_KEY, JSON.stringify(users));
+      console.log(`[SQL_SIM] DELETE FROM users WHERE username='${username}'`);
+      return true;
+  },
+
   // Mock "SQL" query for known peers (now pulling from registered users + mocks)
   getKnownPeers: (): User[] => {
     const users = JSON.parse(localStorage.getItem(USERS_TABLE_KEY) || '{}');

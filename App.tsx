@@ -22,6 +22,7 @@ export default function App() {
     const storedUser = mockSql.getSession();
     if (storedUser) {
         setUser(storedUser);
+        setAppState('MESH');
     }
   }, []);
 
@@ -63,6 +64,12 @@ export default function App() {
       setError('');
       setUsername('');
       setPassword('');
+  };
+
+  const handleLogout = () => {
+      mockSql.clearSession();
+      setUser(null);
+      setAppState('SPLASH');
   };
 
   if (appState === 'SPLASH') {
@@ -184,7 +191,12 @@ export default function App() {
       );
   }
 
-  return (
-      <MeshInterface currentUser={user!} />
-  );
+  // Ensure user exists before rendering MeshInterface
+  if (appState === 'MESH' && user) {
+      return (
+          <MeshInterface currentUser={user} onLogout={handleLogout} />
+      );
+  }
+
+  return null;
 }
