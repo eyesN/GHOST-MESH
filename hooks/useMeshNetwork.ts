@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Message, User, MessageType } from '../types';
+import { mockSql } from '../utils/db';
 
 // We use BroadcastChannel to simulate a local Wi-Fi direct network
 // where all tabs open on the same origin can "see" each other.
 const CHANNEL_NAME = 'ghost_mesh_v1';
 
 interface NetworkPacket {
-  type: 'HELLO' | 'MESSAGE' | 'ACK';
+  type: 'HELLO' | 'MESSAGE' | 'ACK' | 'PING_UPDATE';
   payload: any;
   sender: User;
 }
@@ -16,36 +17,37 @@ export const useMeshNetwork = (currentUser: User) => {
   const [peers, setPeers] = useState<Map<string, User>>(new Map());
   const [channel, setChannel] = useState<BroadcastChannel | null>(null);
 
+  // Helper to sync from "Server" (DB)
+  const syncMessages = useCallback(() => {
+    const history = mockSql.getMessagesForUser(currentUser.id);
+    setMessages(history);
+  }, [currentUser.id]);
+
   useEffect(() => {
+    // Initial Load
+    syncMessages();
+
     const bc = new BroadcastChannel(CHANNEL_NAME);
     setChannel(bc);
 
     bc.onmessage = (event: MessageEvent) => {
       const packet = event.data as NetworkPacket;
       
-      if (packet.sender.id === currentUser.id) return;
-
-      switch (packet.type) {
-        case 'HELLO':
-          setPeers(prev => new Map(prev).set(packet.sender.id, packet.sender));
-          // Reply to HELLO so they know we exist
-          bc.postMessage({
-            type: 'ACK',
-            payload: {},
-            sender: currentUser
-          } as NetworkPacket);
-          break;
-        case 'ACK':
-          setPeers(prev => new Map(prev).set(packet.sender.id, packet.sender));
-          break;
-        case 'MESSAGE':
-          const msg = packet.payload as Message;
-          // Filter out private messages not meant for us
-          if (msg.recipientId && msg.recipientId !== currentUser.id) {
-             return;
+      // Peer Discovery Logic
+      if (packet.sender.id !== currentUser.id) {
+          if (packet.type === 'HELLO' || packet.type === 'ACK') {
+             setPeers(prev => new Map(prev).set(packet.sender.id, packet.sender));
+             if (packet.type === 'HELLO') {
+                // Reply to HELLO
+                bc.postMessage({ type: 'ACK', payload: {}, sender: currentUser } as NetworkPacket);
+             }
           }
-          setMessages(prev => [...prev, msg]);
-          break;
+      }
+
+      // Message Sync Logic
+      if (packet.type === 'PING_UPDATE') {
+          // Another tab/user sent a message, check DB
+          syncMessages();
       }
     };
 
@@ -59,11 +61,9 @@ export const useMeshNetwork = (currentUser: User) => {
     return () => {
       bc.close();
     };
-  }, [currentUser]);
+  }, [currentUser, syncMessages]);
 
   const broadcastMessage = useCallback((content: string, recipientId?: string) => {
-    if (!channel) return;
-
     const newMessage: Message = {
       id: crypto.randomUUID(),
       senderId: currentUser.id,
@@ -74,15 +74,23 @@ export const useMeshNetwork = (currentUser: User) => {
       isEncrypted: true,
     };
 
-    // Optimistic UI update
+    // 1. Save to "Server" (DB) for persistence/offline delivery
+    mockSql.addMessage(newMessage);
+
+    // 2. Optimistic Update Local
     setMessages(prev => [...prev, newMessage]);
 
-    // Send to network
-    channel.postMessage({
-      type: 'MESSAGE',
-      payload: newMessage,
-      sender: currentUser
-    } as NetworkPacket);
+    // 3. Signal Network (simulates packet sending + server push)
+    if (channel) {
+       // We send a PING_UPDATE so others know to check the DB.
+       // We can also send the MESSAGE payload if we wanted pure P2P without DB, 
+       // but here we are hybrid.
+       channel.postMessage({
+          type: 'PING_UPDATE',
+          payload: newMessage,
+          sender: currentUser
+       } as NetworkPacket);
+    }
 
     return newMessage;
   }, [channel, currentUser]);

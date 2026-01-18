@@ -15,19 +15,28 @@ interface MeshInterfaceProps {
   onLogout: () => void;
 }
 
-export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser, onLogout }) => {
+export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initialUser, onLogout }) => {
+  // Use local state for user to reflect profile updates immediately
+  const [currentUser, setCurrentUser] = useState(initialUser);
   const { messages, peers, broadcastMessage, scanForPeers } = useMeshNetwork(currentUser);
   
   // Navigation & State
   const [activeChatId, setActiveChatId] = useState<string | null>(null); 
   const [isLocatorOpen, setIsLocatorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDeleteMode, setIsDeleteMode] = useState(false); // Sub-mode in settings
+  const [isDeleteMode, setIsDeleteMode] = useState(false); 
   
   // Inputs
   const [mainInput, setMainInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Settings Inputs
+  const [editUsername, setEditUsername] = useState(currentUser.username);
+  const [editAvatarUrl, setEditAvatarUrl] = useState(currentUser.avatarUrl);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Delete Account Inputs
   const [delUsername, setDelUsername] = useState('');
   const [delPassword, setDelPassword] = useState('');
@@ -90,6 +99,40 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser, onLog
     setMainInput('');
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditAvatarUrl(reader.result as string);
+        setIsEditingProfile(true); // Enable save button
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProfile = () => {
+      setSettingsError('');
+      if (editUsername.length < 3) {
+          setSettingsError('Username too short');
+          return;
+      }
+
+      const result = mockSql.updateUserProfile(currentUser.username, {
+          username: editUsername,
+          avatarUrl: editAvatarUrl
+      });
+
+      if ('error' in result) {
+          setSettingsError(result.error);
+      } else {
+          setCurrentUser(result as User);
+          mockSql.saveSession(result as User); // Update active session
+          setIsEditingProfile(false);
+          // Show success feedback briefly?
+      }
+  };
+
   const handleDeleteAccount = (e: React.FormEvent) => {
       e.preventDefault();
       setDelError('');
@@ -103,13 +146,11 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser, onLog
 
   const isHealthy = status === 'ONLINE';
 
-  // Combine Mock Peers and Real Peers for Contacts List logic
   const allContacts: User[] = [
       ...mockSql.getKnownPeers(),
       ...Array.from(peers.values())
   ].filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()) && u.id !== currentUser.id);
 
-  // Filter Messages for Active Chat
   const displayedMessages = activeChatId === SELF_ID 
       ? selfMessages 
       : activeChatId 
@@ -126,10 +167,6 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser, onLog
         ? 'Personal Safe' 
         : allContacts.find(c => c.id === activeChatId)?.username || 'Unknown Node';
 
-  // Derived Active Conversations for the "Interactive Page" List
-  // 1. Broadcast (Always)
-  // 2. Self (Always)
-  // 3. Any peer we have history with in `messages`
   const activeConversationIds = new Set<string>();
   messages.forEach(m => {
       if (m.recipientId && m.senderId === currentUser.id) activeConversationIds.add(m.recipientId);
@@ -163,7 +200,6 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser, onLog
                      <h2 className="text-lg font-bold text-white tracking-wide">{activePeerName}</h2>
                  </div>
                  
-                 {/* Close Button Bubble */}
                  <button 
                     onClick={() => setActiveChatId(null)}
                     className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center border border-slate-600 transition-colors"
@@ -231,7 +267,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser, onLog
           </div>
 
           <button 
-            onClick={() => { setIsSettingsOpen(!isSettingsOpen); setIsDeleteMode(false); }}
+            onClick={() => { setIsSettingsOpen(!isSettingsOpen); setIsDeleteMode(false); setEditUsername(currentUser.username); setEditAvatarUrl(currentUser.avatarUrl); setIsEditingProfile(false); }}
             className="text-slate-400 hover:text-white transition-colors"
           >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -305,17 +341,49 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser, onLog
                
                {!isDeleteMode ? (
                    <>
-                       {/* Profile Card */}
-                       <div className="w-full max-w-sm bg-slate-800 rounded-3xl border border-slate-700 flex flex-col items-center justify-center p-8 gap-6 relative overflow-hidden shadow-2xl mb-8">
-                            <div className="relative">
-                                <img src={currentUser.avatarUrl} alt="Profile" className="w-24 h-24 rounded-full border-4 border-slate-900 shadow-xl z-10" />
+                       {/* Profile Card & Editing */}
+                       <div className="w-full max-w-sm bg-slate-800 rounded-3xl border border-slate-700 flex flex-col items-center justify-center p-6 gap-6 relative overflow-hidden shadow-2xl mb-8">
+                            {/* Hidden File Input */}
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                className="hidden" 
+                                accept="image/*" 
+                                onChange={handleFileChange}
+                            />
+
+                            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                <img src={editAvatarUrl} alt="Profile" className="w-24 h-24 rounded-full border-4 border-slate-900 shadow-xl z-10 object-cover" />
+                                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                     <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                     </svg>
+                                </div>
                                 <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-4 border-slate-800 z-20 ${isHealthy ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                             </div>
                             
-                            <div className="text-center z-10">
-                                <h3 className="text-2xl font-bold text-white font-mono">{currentUser.username}</h3>
-                                <p className="text-emerald-500 text-xs tracking-widest mt-1">ID: {currentUser.id.substring(0,8)}</p>
+                            <div className="text-center z-10 w-full px-4">
+                                <label className="text-xs text-slate-500 uppercase tracking-widest block mb-1">Display Name / ID</label>
+                                <input 
+                                    type="text" 
+                                    value={editUsername} 
+                                    onChange={(e) => { setEditUsername(e.target.value); setIsEditingProfile(true); }}
+                                    className="bg-slate-900/50 border border-slate-600 rounded text-center text-white font-mono font-bold py-2 w-full focus:outline-none focus:border-emerald-500"
+                                />
+                                <p className="text-emerald-500 text-xs tracking-widest mt-2">ID: {currentUser.id.substring(0,8)}</p>
                             </div>
+
+                            {settingsError && <p className="text-red-400 text-xs font-bold">{settingsError}</p>}
+
+                            {isEditingProfile && (
+                                <button 
+                                    onClick={handleSaveProfile}
+                                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-sm shadow-lg"
+                                >
+                                    Save Profile Changes
+                                </button>
+                            )}
                        </div>
 
                        {/* Action Buttons */}
