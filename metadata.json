@@ -1,0 +1,5 @@
+{
+  "name": "Copy of GhostMesh",
+  "description": "A decentralized, simulated Wi-Fi Direct text messaging application focusing on privacy and offline-first communication using BroadcastChannel for local peer simulation and Gemini for intelligent assistance.",
+  "requestFramePermissions": []
+}
