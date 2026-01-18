@@ -1,6 +1,7 @@
 import { User } from '../types';
 
 const DB_KEY = 'ghost_mesh_sql_db_v1';
+const SELF_CHAT_KEY = 'ghost_mesh_self_chat_v1';
 
 export const mockSql = {
   saveUser: (user: User) => {
@@ -28,5 +29,42 @@ export const mockSql = {
 
   clearUser: () => {
     localStorage.removeItem(DB_KEY);
+  },
+
+  // Mock "SQL" query for known peers
+  getKnownPeers: (): User[] => {
+    return [
+      {
+        id: 'mock_adit_01',
+        username: 'adit',
+        publicKey: 'KEY_ADIT_X99',
+        avatarUrl: 'https://ui-avatars.com/api/?name=Adit&background=6366f1&color=fff'
+      },
+      {
+        id: 'mock_hitler_02',
+        username: 'hitler',
+        publicKey: 'KEY_HITLER_Z88',
+        avatarUrl: 'https://ui-avatars.com/api/?name=Hitler&background=ef4444&color=fff'
+      }
+    ];
+  },
+
+  // Self chat storage
+  saveSelfMessage: (content: string) => {
+    const existing = JSON.parse(localStorage.getItem(SELF_CHAT_KEY) || '[]');
+    const msg = {
+        id: crypto.randomUUID(),
+        content,
+        timestamp: Date.now(),
+        type: 'TEXT',
+        isEncrypted: true,
+        senderId: 'SELF'
+    };
+    localStorage.setItem(SELF_CHAT_KEY, JSON.stringify([...existing, msg]));
+    return msg;
+  },
+
+  getSelfMessages: () => {
+      return JSON.parse(localStorage.getItem(SELF_CHAT_KEY) || '[]');
   }
 };
