@@ -18,7 +18,8 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
   const { messages, peers, broadcastMessage, scanForPeers } = useMeshNetwork(currentUser);
   
   // Navigation & State
-  const [activeChatId, setActiveChatId] = useState<string>(BROADCAST_ID);
+  // Default to NULL (Empty state) to force user to choose a contact via Locator
+  const [activeChatId, setActiveChatId] = useState<string | null>(null); 
   const [isLocatorOpen, setIsLocatorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
@@ -38,7 +39,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
       if (activeChatId === SELF_ID) {
           setSelfMessages(mockSql.getSelfMessages());
       }
-  }, [activeChatId, isLocatorOpen]); // Reload when locator opens (save action)
+  }, [activeChatId, isLocatorOpen]); 
 
   // Network Status
   useEffect(() => {
@@ -61,9 +62,9 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mainInput.trim()) return;
+    if (!activeChatId) return;
 
     if (activeChatId === SELF_ID) {
-        // Fallback if they are in self view and type in main box
         const msg = mockSql.saveSelfMessage(mainInput);
         setSelfMessages(prev => [...prev, msg]);
     } else {
@@ -89,27 +90,27 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
       if (!selfNoteInput.trim()) return;
       mockSql.saveSelfMessage(selfNoteInput);
       setSelfNoteInput('');
-      // Optional: Give feedback or stay in locator
   };
 
   const isHealthy = status === 'ONLINE';
 
   // Combine Mock Peers and Real Peers for Contacts List
-  const allContacts = [
-      { id: SELF_ID, username: 'Personal Safe', avatarUrl: currentUser.avatarUrl, publicKey: 'LOCAL_STORAGE' }, // Special contact
+  const allContacts: User[] = [
+      { id: SELF_ID, username: 'Personal Safe', avatarUrl: currentUser.avatarUrl, publicKey: 'LOCAL_STORAGE' } as User, // Special contact
       ...mockSql.getKnownPeers(),
       ...Array.from(peers.values())
-  ].filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+  ].filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()) && u.id !== currentUser.id);
 
   // Filter Messages for Current View
   const displayedMessages = activeChatId === SELF_ID 
       ? selfMessages 
-      : messages.filter(m => {
-          if (activeChatId === BROADCAST_ID) return !m.recipientId; // Show broadcast only
-          // Private: Show if (Sender is Me AND Recipient is Them) OR (Sender is Them AND Recipient is Me)
+      : activeChatId 
+        ? messages.filter(m => {
+          if (activeChatId === BROADCAST_ID) return !m.recipientId; 
           return (m.senderId === currentUser.id && m.recipientId === activeChatId) || 
                  (m.senderId === activeChatId && m.recipientId === currentUser.id);
-      });
+        })
+        : [];
 
   const activePeerName = activeChatId === BROADCAST_ID 
       ? 'BROADCAST' 
@@ -120,15 +121,17 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
   return (
     <div className="relative h-screen w-full bg-slate-900 text-slate-100 overflow-hidden flex flex-col font-sans">
       
-      {/* 1. TOP HEADER (Screenshot 2 Style) */}
+      {/* 1. TOP HEADER */}
       <div className="flex items-center justify-between p-4 bg-slate-900/90 backdrop-blur-sm z-30 h-16 shrink-0 border-b border-slate-800/50">
           <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold tracking-tighter text-white">
                   GHOST <span className="text-emerald-500">MESH</span>
               </h1>
-              <span className="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-400 font-mono uppercase">
-                  {activePeerName}
-              </span>
+              {activeChatId && (
+                  <span className="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-400 font-mono uppercase">
+                      {activePeerName}
+                  </span>
+              )}
           </div>
 
           <button 
@@ -142,16 +145,30 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
           </button>
       </div>
 
-      {/* 2. MAIN CHAT AREA (Screenshot 2 Style) */}
+      {/* 2. MAIN CHAT AREA */}
       <div className="flex-1 relative overflow-hidden flex flex-col">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4" ref={scrollRef}>
-             {displayedMessages.length === 0 && (
+             {/* Empty State / Not General Channel Info */}
+             {!activeChatId && (
+                 <div className="flex flex-col items-center justify-center h-full opacity-40">
+                     <div className="w-40 h-40 rounded-full border border-slate-700 flex items-center justify-center mb-6 relative animate-pulse-slow">
+                        <div className="w-28 h-28 rounded-full border border-slate-700/50"></div>
+                     </div>
+                     <h3 className="text-sm font-bold text-slate-300 tracking-widest mb-2">ENCRYPTED CHANNEL EMPTY</h3>
+                     <p className="text-[10px] text-slate-500 font-mono text-center max-w-xs">
+                         This interface is reserved for active peer-to-peer links. 
+                         Open the Locator <span className="text-emerald-500">(Hex Button)</span> to establish a connection.
+                     </p>
+                 </div>
+             )}
+
+             {activeChatId && displayedMessages.length === 0 && (
                  <div className="flex flex-col items-center justify-center h-full opacity-30">
                      <div className="w-32 h-32 rounded-full border border-slate-700 flex items-center justify-center mb-4">
                         <div className="w-24 h-24 rounded-full border border-slate-700/50"></div>
                      </div>
-                     <p className="text-xs font-mono">ENCRYPTED CHANNEL EMPTY</p>
+                     <p className="text-xs font-mono">HISTORY CLEARED / NEW SESSION</p>
                  </div>
              )}
              
@@ -163,7 +180,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
                 </div>
              )}
 
-             {displayedMessages.map((msg) => (
+             {activeChatId && displayedMessages.map((msg) => (
                 <MessageBubble 
                     key={msg.id} 
                     message={msg} 
@@ -173,8 +190,8 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
             ))}
           </div>
           
-          {/* Main Input Area */}
-          <div className="p-4 bg-slate-900 border-t border-slate-800 pl-24 relative z-20">
+          {/* Main Input Area (Hidden if no chat active) */}
+          <div className={`p-4 bg-slate-900 border-t border-slate-800 pl-24 relative z-20 transition-transform duration-300 ${!activeChatId ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}>
             <form onSubmit={handleSendMessage} className="flex gap-2">
                 <input
                     type="text"
@@ -229,7 +246,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
           </div>
       )}
 
-      {/* 4. LOCATOR OVERLAY (Screenshot 3 Style) */}
+      {/* 4. LOCATOR OVERLAY */}
       {isLocatorOpen && (
         <div className="absolute inset-0 z-40 bg-slate-950/95 backdrop-blur-md flex flex-col animate-in slide-in-from-bottom duration-300">
              {/* Top Search */}
@@ -255,7 +272,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser }) => 
              {/* Radar Box */}
              <div className="px-6 mb-6">
                  <div className="w-full h-40 border-2 border-slate-600 rounded-lg bg-slate-900 relative overflow-hidden flex items-center justify-center">
-                      <RadarScan scanning={true} onScan={scanForPeers} peerCount={allContacts.length - 3} /> {/* -3 for mock/self offset approximation */}
+                      <RadarScan scanning={true} onScan={scanForPeers} peerCount={allContacts.length - 2} />
                  </div>
              </div>
 
