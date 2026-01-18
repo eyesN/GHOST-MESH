@@ -20,6 +20,7 @@ export interface User {
 export interface Message {
   id: string;
   senderId: string;
+  recipientId?: string; // Optional: If present, it's a private message to this ID. If null/undefined, it's BROADCAST.
   content: string;
   timestamp: number;
   type: MessageType;

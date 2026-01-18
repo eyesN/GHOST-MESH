@@ -40,6 +40,10 @@ export const useMeshNetwork = (currentUser: User) => {
           break;
         case 'MESSAGE':
           const msg = packet.payload as Message;
+          // Filter out private messages not meant for us
+          if (msg.recipientId && msg.recipientId !== currentUser.id) {
+             return;
+          }
           setMessages(prev => [...prev, msg]);
           break;
       }
@@ -57,12 +61,13 @@ export const useMeshNetwork = (currentUser: User) => {
     };
   }, [currentUser]);
 
-  const broadcastMessage = useCallback((content: string) => {
+  const broadcastMessage = useCallback((content: string, recipientId?: string) => {
     if (!channel) return;
 
     const newMessage: Message = {
       id: crypto.randomUUID(),
       senderId: currentUser.id,
+      recipientId: recipientId,
       content,
       timestamp: Date.now(),
       type: MessageType.TEXT,
