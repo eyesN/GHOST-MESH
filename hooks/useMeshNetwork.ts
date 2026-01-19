@@ -18,13 +18,14 @@ export const useMeshNetwork = (currentUser: User) => {
   const [channel, setChannel] = useState<BroadcastChannel | null>(null);
 
   // Helper to sync from "Server" (DB)
+  // This decrypts messages from local storage
   const syncMessages = useCallback(() => {
     const history = mockSql.getMessagesForUser(currentUser.id);
     setMessages(history);
   }, [currentUser.id]);
 
   useEffect(() => {
-    // Initial Load
+    // Initial Load - retrieves encrypted chats from device storage
     syncMessages();
 
     const bc = new BroadcastChannel(CHANNEL_NAME);
@@ -46,7 +47,7 @@ export const useMeshNetwork = (currentUser: User) => {
 
       // Message Sync Logic
       if (packet.type === 'PING_UPDATE') {
-          // Another tab/user sent a message, check DB
+          // Another tab/user sent a message, check DB to stay in sync
           syncMessages();
       }
     };
@@ -63,18 +64,18 @@ export const useMeshNetwork = (currentUser: User) => {
     };
   }, [currentUser, syncMessages]);
 
-  const broadcastMessage = useCallback((content: string, recipientId?: string) => {
+  const broadcastMessage = useCallback((content: string, recipientId?: string, type: MessageType = MessageType.TEXT) => {
     const newMessage: Message = {
       id: crypto.randomUUID(),
       senderId: currentUser.id,
       recipientId: recipientId,
       content,
       timestamp: Date.now(),
-      type: MessageType.TEXT,
+      type: type,
       isEncrypted: true,
     };
 
-    // 1. Save to "Server" (DB) for persistence/offline delivery
+    // 1. Save to "Server" (DB) for persistence/offline delivery (Encrypted)
     mockSql.addMessage(newMessage);
 
     // 2. Optimistic Update Local
@@ -83,8 +84,6 @@ export const useMeshNetwork = (currentUser: User) => {
     // 3. Signal Network (simulates packet sending + server push)
     if (channel) {
        // We send a PING_UPDATE so others know to check the DB.
-       // We can also send the MESSAGE payload if we wanted pure P2P without DB, 
-       // but here we are hybrid.
        channel.postMessage({
           type: 'PING_UPDATE',
           payload: newMessage,

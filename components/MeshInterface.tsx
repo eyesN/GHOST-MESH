@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useMeshNetwork } from '../hooks/useMeshNetwork';
-import { User, Message } from '../types';
+import { User, Message, MessageType } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { HexButton } from './HexButton';
 import { RadarScan } from './RadarScan';
@@ -24,7 +24,10 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
   const [activeChatId, setActiveChatId] = useState<string | null>(null); 
   const [isLocatorOpen, setIsLocatorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDeleteMode, setIsDeleteMode] = useState(false); 
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+  
+  // Hotspot Feature
+  const [isHotspotMode, setIsHotspotMode] = useState(false);
   
   // Inputs
   const [mainInput, setMainInput] = useState('');
@@ -82,8 +85,15 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
         const msg = mockSql.saveSelfMessage(mainInput);
         setSelfMessages(prev => [...prev, msg]);
     } else {
+        // If Hotspot is ON, force message type to HOTSPOT and ensure it behaves like a broadcast if desirable
+        // But here we allow Hotspot messages in private chats too if the user really wants, 
+        // though typically a Hotspot Broadcast is for the Broadcast channel.
+        // Logic: If Hotspot Mode is active, message type is HOTSPOT.
+        
+        const type = isHotspotMode ? MessageType.HOTSPOT : MessageType.TEXT;
         const recipient = activeChatId === BROADCAST_ID ? undefined : activeChatId;
-        broadcastMessage(mainInput, recipient);
+        
+        broadcastMessage(mainInput, recipient, type);
 
         // AI Mock Trigger for Broadcast
         if (activeChatId === BROADCAST_ID && mainInput.toLowerCase().includes("@gemini")) {
@@ -97,6 +107,15 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
         }
     }
     setMainInput('');
+  };
+
+  const toggleHotspot = () => {
+      const newState = !isHotspotMode;
+      setIsHotspotMode(newState);
+      if (newState) {
+          // Auto switch to broadcast channel when activating hotspot for ease of use
+          setActiveChatId(BROADCAST_ID);
+      }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +148,6 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
           setCurrentUser(result as User);
           mockSql.saveSession(result as User); // Update active session
           setIsEditingProfile(false);
-          // Show success feedback briefly?
       }
   };
 
@@ -146,10 +164,10 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
 
   const isHealthy = status === 'ONLINE';
 
-  const allContacts: User[] = [
+  const allContacts: User[] = ([
       ...mockSql.getKnownPeers(),
       ...Array.from(peers.values())
-  ].filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()) && u.id !== currentUser.id);
+  ] as User[]).filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()) && u.id !== currentUser.id);
 
   const displayedMessages = activeChatId === SELF_ID 
       ? selfMessages 
@@ -187,31 +205,56 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
       })
   ];
 
+  // Hotspot Overlay Style
+  const hotspotGlow = isHotspotMode ? 'shadow-[inset_0_0_50px_rgba(245,158,11,0.1)] border-amber-500/20' : '';
+
   // ----------------------------------------------------------------------------------
   // VIEW: ACTIVE CHAT
   // ----------------------------------------------------------------------------------
   if (activeChatId) {
     return (
-        <div className="relative h-screen w-full bg-slate-900 text-slate-100 overflow-hidden flex flex-col font-sans">
+        <div className={`relative h-screen w-full bg-slate-900 text-slate-100 overflow-hidden flex flex-col font-sans transition-all duration-500 ${isHotspotMode ? 'border-4 border-amber-500/30' : ''}`}>
+             
+             {/* Hotspot Active Indicator Overlay */}
+             {isHotspotMode && (
+                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 animate-pulse z-50"></div>
+             )}
+
              {/* Header */}
              <div className="flex items-center justify-between p-4 bg-slate-900/95 backdrop-blur-sm z-30 h-16 shrink-0 border-b border-slate-800/50">
                  <div className="flex items-center gap-3">
-                     <div className={`w-3 h-3 rounded-full ${activeChatId === BROADCAST_ID ? 'bg-emerald-500' : 'bg-blue-500'} animate-pulse`}></div>
-                     <h2 className="text-lg font-bold text-white tracking-wide">{activePeerName}</h2>
+                     <div className={`w-3 h-3 rounded-full ${activeChatId === BROADCAST_ID ? (isHotspotMode ? 'bg-amber-500 animate-ping' : 'bg-emerald-500') : 'bg-blue-500'} `}></div>
+                     <div className="flex flex-col">
+                        <h2 className="text-lg font-bold text-white tracking-wide leading-none">{activePeerName}</h2>
+                        {isHotspotMode && <span className="text-[9px] text-amber-500 font-bold tracking-widest mt-1">HOTSPOT BEACON ACTIVE</span>}
+                     </div>
                  </div>
                  
-                 <button 
-                    onClick={() => setActiveChatId(null)}
-                    className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center border border-slate-600 transition-colors"
-                 >
-                     <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                     </svg>
-                 </button>
+                 <div className="flex items-center gap-3">
+                     {/* Toggle Hotspot inside Chat too? Yes, for ease of access */}
+                     <button
+                        onClick={toggleHotspot}
+                        className={`p-2 rounded-full transition-all ${isHotspotMode ? 'bg-amber-500/20 text-amber-500' : 'text-slate-500 hover:text-amber-500'}`}
+                        title="Toggle Hotspot Beacon"
+                     >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                        </svg>
+                     </button>
+
+                     <button 
+                        onClick={() => setActiveChatId(null)}
+                        className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center border border-slate-600 transition-colors"
+                     >
+                         <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                         </svg>
+                     </button>
+                 </div>
              </div>
 
              {/* Messages */}
-             <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4" ref={scrollRef}>
+             <div className={`flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-4 ${hotspotGlow}`} ref={scrollRef}>
                 {displayedMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full opacity-30">
                         <div className="w-24 h-24 rounded-full border border-slate-700 flex items-center justify-center mb-4">
@@ -232,16 +275,16 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
              </div>
 
              {/* Input */}
-             <div className="p-4 bg-slate-900 border-t border-slate-800 pl-4 relative z-20">
+             <div className={`p-4 bg-slate-900 border-t ${isHotspotMode ? 'border-amber-500/30' : 'border-slate-800'} pl-4 relative z-20`}>
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                     <input
                         type="text"
                         value={mainInput}
                         onChange={(e) => setMainInput(e.target.value)}
-                        placeholder={`Message ${activePeerName}...`}
-                        className="flex-1 bg-slate-800 text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans text-sm border border-transparent placeholder-slate-600"
+                        placeholder={isHotspotMode ? "BROADCASTING TO HOTSPOT..." : `Message ${activePeerName}...`}
+                        className={`flex-1 bg-slate-800 text-slate-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-1 font-sans text-sm border border-transparent placeholder-slate-600 transition-all ${isHotspotMode ? 'focus:ring-amber-500 placeholder-amber-500/50' : 'focus:ring-emerald-500'}`}
                     />
-                    <button type="submit" className="bg-emerald-600 text-white p-3 rounded-lg hover:bg-emerald-500 shadow-lg shadow-emerald-900/20">
+                    <button type="submit" className={`p-3 rounded-lg shadow-lg transition-colors text-white ${isHotspotMode ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20'}`}>
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
@@ -256,25 +299,43 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
   // VIEW: CHAT LIST (INTERACTIVE PAGE)
   // ----------------------------------------------------------------------------------
   return (
-    <div className="relative h-screen w-full bg-slate-900 text-slate-100 overflow-hidden flex flex-col font-sans">
+    <div className={`relative h-screen w-full bg-slate-900 text-slate-100 overflow-hidden flex flex-col font-sans transition-all duration-500 ${isHotspotMode ? 'border-x-4 border-amber-500/20' : ''}`}>
       
+      {/* Hotspot Active Indicator Overlay */}
+      {isHotspotMode && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 animate-pulse z-50"></div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-slate-900/90 backdrop-blur-sm z-30 h-16 shrink-0 border-b border-slate-800/50">
           <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold tracking-tighter text-white">
-                  GHOST <span className="text-emerald-500">MESH</span>
+                  GHOST <span className={isHotspotMode ? "text-amber-500 animate-pulse" : "text-emerald-500"}>MESH</span>
               </h1>
           </div>
 
-          <button 
-            onClick={() => { setIsSettingsOpen(!isSettingsOpen); setIsDeleteMode(false); setEditUsername(currentUser.username); setEditAvatarUrl(currentUser.avatarUrl); setIsEditingProfile(false); }}
-            className="text-slate-400 hover:text-white transition-colors"
-          >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-          </button>
+          <div className="flex items-center gap-3">
+             {/* Hotspot Toggle Button */}
+             <button
+                onClick={toggleHotspot}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${isHotspotMode ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'}`}
+             >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                </svg>
+                {isHotspotMode && <span className="text-[10px] font-bold tracking-wider">ON</span>}
+             </button>
+
+             <button 
+                onClick={() => { setIsSettingsOpen(!isSettingsOpen); setIsDeleteMode(false); setEditUsername(currentUser.username); setEditAvatarUrl(currentUser.avatarUrl); setIsEditingProfile(false); }}
+                className="text-slate-400 hover:text-white transition-colors"
+             >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+             </button>
+          </div>
       </div>
 
       {/* Main List Area */}
@@ -285,10 +346,10 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
               <button 
                   key={chat.id}
                   onClick={() => setActiveChatId(chat.id)}
-                  className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 transition-all group"
+                  className={`w-full bg-slate-800/50 hover:bg-slate-800 border ${isHotspotMode && chat.type === 'BROADCAST' ? 'border-amber-500/50 bg-amber-900/10' : 'border-slate-700/50 hover:border-emerald-500/30'} rounded-xl p-4 flex items-center gap-4 transition-all group`}
               >
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 
-                      ${chat.type === 'BROADCAST' ? 'bg-emerald-900/50 text-emerald-400' : 
+                      ${chat.type === 'BROADCAST' ? (isHotspotMode ? 'bg-amber-500 text-slate-900 animate-pulse' : 'bg-emerald-900/50 text-emerald-400') : 
                         chat.type === 'SELF' ? 'bg-indigo-900/50 text-indigo-400' : 
                         'bg-slate-700 text-slate-300'}`}
                   >
@@ -304,11 +365,13 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
                   </div>
                   
                   <div className="flex-1 text-left">
-                      <div className="text-sm font-bold text-slate-200 group-hover:text-emerald-400 transition-colors">{chat.name}</div>
-                      <div className="text-xs text-slate-500 font-mono">{chat.preview}</div>
+                      <div className={`text-sm font-bold transition-colors ${isHotspotMode && chat.type === 'BROADCAST' ? 'text-amber-500' : 'text-slate-200 group-hover:text-emerald-400'}`}>{chat.name}</div>
+                      <div className="text-xs text-slate-500 font-mono">
+                          {isHotspotMode && chat.type === 'BROADCAST' ? 'BEACON ACTIVE' : chat.preview}
+                      </div>
                   </div>
                   
-                  <div className="text-slate-600 group-hover:text-emerald-500">
+                  <div className={`${isHotspotMode && chat.type === 'BROADCAST' ? 'text-amber-500' : 'text-slate-600 group-hover:text-emerald-500'}`}>
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </div>
               </button>

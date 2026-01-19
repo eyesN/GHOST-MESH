@@ -5,6 +5,42 @@ const USERS_TABLE_KEY = 'ghost_mesh_users_table_v1';
 const SELF_CHAT_KEY = 'ghost_mesh_self_chat_v1';
 const MESSAGES_KEY = 'ghost_mesh_messages_v1';
 
+// Encryption Helpers (Simulating Encryption At Rest)
+// We use a combination of URI encoding (to handle Unicode), Base64, and string reversal
+// to create an obfuscated string that isn't immediately readable in LocalStorage.
+const encryptData = (data: any): string => {
+  try {
+    const jsonString = JSON.stringify(data);
+    const uriEncoded = encodeURIComponent(jsonString);
+    const base64 = btoa(uriEncoded);
+    // Reverse the string to break standard Base64 decoders
+    return base64.split('').reverse().join('');
+  } catch (e) {
+    console.error("Storage encryption failed", e);
+    return '';
+  }
+};
+
+const decryptData = (encryptedData: string): any => {
+  try {
+    // 1. Reverse back
+    const base64 = encryptedData.split('').reverse().join('');
+    // 2. Decode Base64
+    const uriEncoded = atob(base64);
+    // 3. Decode URI components
+    const jsonString = decodeURIComponent(uriEncoded);
+    return JSON.parse(jsonString);
+  } catch (e) {
+    // Fail-safe: Try parsing as plain JSON (handles migration from unencrypted data)
+    try {
+      return JSON.parse(encryptedData);
+    } catch (e2) {
+      console.warn("Failed to decrypt or parse storage data");
+      return null;
+    }
+  }
+};
+
 // Seed initial users if empty
 const seedUsers = () => {
     if (!localStorage.getItem(USERS_TABLE_KEY)) {
@@ -18,7 +54,7 @@ const seedUsers = () => {
 seedUsers();
 
 export const mockSql = {
-  // Session Management
+  // Session Management (Not encrypted for easier debugging, usually handled by HttpOnly cookies in real apps)
   saveSession: (user: User) => {
     try {
       localStorage.setItem(DB_KEY, JSON.stringify(user));
@@ -131,9 +167,11 @@ export const mockSql = {
     });
   },
 
-  // Self chat storage
+  // Self chat storage with ENCRYPTION
   saveSelfMessage: (content: string) => {
-    const existing = JSON.parse(localStorage.getItem(SELF_CHAT_KEY) || '[]');
+    const rawData = localStorage.getItem(SELF_CHAT_KEY);
+    const existing = rawData ? (decryptData(rawData) || []) : [];
+    
     const msg = {
         id: crypto.randomUUID(),
         content,
@@ -142,23 +180,37 @@ export const mockSql = {
         isEncrypted: true,
         senderId: 'SELF'
     };
-    localStorage.setItem(SELF_CHAT_KEY, JSON.stringify([...existing, msg]));
+    
+    const newData = [...existing, msg];
+    const encrypted = encryptData(newData);
+    if (encrypted) {
+        localStorage.setItem(SELF_CHAT_KEY, encrypted);
+    }
     return msg;
   },
 
   getSelfMessages: () => {
-      return JSON.parse(localStorage.getItem(SELF_CHAT_KEY) || '[]');
+      const rawData = localStorage.getItem(SELF_CHAT_KEY);
+      return rawData ? (decryptData(rawData) || []) : [];
   },
 
-  // Global Message Server Simulation
+  // Global Message Server Simulation with ENCRYPTION
   addMessage: (message: Message) => {
-      const msgs = JSON.parse(localStorage.getItem(MESSAGES_KEY) || '[]');
+      const rawData = localStorage.getItem(MESSAGES_KEY);
+      const msgs = rawData ? (decryptData(rawData) || []) : [];
+      
       msgs.push(message);
-      localStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs));
+      
+      const encrypted = encryptData(msgs);
+      if (encrypted) {
+          localStorage.setItem(MESSAGES_KEY, encrypted);
+      }
   },
 
   getMessagesForUser: (userId: string): Message[] => {
-      const msgs = JSON.parse(localStorage.getItem(MESSAGES_KEY) || '[]');
+      const rawData = localStorage.getItem(MESSAGES_KEY);
+      const msgs = rawData ? (decryptData(rawData) || []) : [];
+      
       return msgs.filter((m: Message) => 
           // Broadcast messages
           !m.recipientId || 

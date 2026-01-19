@@ -1,7 +1,8 @@
 export enum MessageType {
   TEXT = 'TEXT',
   SYSTEM = 'SYSTEM',
-  IMAGE = 'IMAGE'
+  IMAGE = 'IMAGE',
+  HOTSPOT = 'HOTSPOT'
 }
 
 export enum PeerStatus {
