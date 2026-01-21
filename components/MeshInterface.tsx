@@ -18,7 +18,11 @@ interface MeshInterfaceProps {
 export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initialUser, onLogout }) => {
   // Use local state for user to reflect profile updates immediately
   const [currentUser, setCurrentUser] = useState(initialUser);
-  const { messages, peers, broadcastMessage, scanForPeers } = useMeshNetwork(currentUser);
+  
+  // Frequency State
+  const [frequency, setFrequency] = useState('2.412');
+
+  const { messages, peers, broadcastMessage, scanForPeers } = useMeshNetwork(currentUser, frequency);
   
   // Navigation & State
   const [activeChatId, setActiveChatId] = useState<string | null>(null); 
@@ -226,7 +230,10 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
                      <div className={`w-3 h-3 rounded-full ${activeChatId === BROADCAST_ID ? (isHotspotMode ? 'bg-amber-500 animate-ping' : 'bg-emerald-500') : 'bg-blue-500'} `}></div>
                      <div className="flex flex-col">
                         <h2 className="text-lg font-bold text-white tracking-wide leading-none">{activePeerName}</h2>
-                        {isHotspotMode && <span className="text-[9px] text-amber-500 font-bold tracking-widest mt-1">HOTSPOT BEACON ACTIVE</span>}
+                        <div className="flex gap-2">
+                            {isHotspotMode && <span className="text-[9px] text-amber-500 font-bold tracking-widest mt-1">HOTSPOT BEACON</span>}
+                            <span className="text-[9px] text-slate-500 font-mono mt-1">{frequency} GHz</span>
+                        </div>
                      </div>
                  </div>
                  
@@ -312,6 +319,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
               <h1 className="text-lg font-bold tracking-tighter text-white">
                   GHOST <span className={isHotspotMode ? "text-amber-500 animate-pulse" : "text-emerald-500"}>MESH</span>
               </h1>
+              <span className="text-[10px] bg-slate-800 border border-slate-700 px-1 rounded text-slate-400 font-mono">{frequency}</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -537,7 +545,13 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
              {/* Radar Box */}
              <div className="px-6 mb-6">
                  <div className="w-full h-40 border-2 border-slate-600 rounded-lg bg-slate-900 relative overflow-hidden flex items-center justify-center">
-                      <RadarScan scanning={true} onScan={scanForPeers} peerCount={allContacts.length} />
+                      <RadarScan 
+                          scanning={true} 
+                          onScan={scanForPeers} 
+                          peerCount={allContacts.length} 
+                          frequency={frequency}
+                          onFrequencyChange={setFrequency}
+                      />
                  </div>
              </div>
 
@@ -557,7 +571,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
                          </button>
                      ))}
                      {allContacts.length === 0 && (
-                         <div className="text-slate-600 text-center py-4 text-xs italic">No contacts found in proximity</div>
+                         <div className="text-slate-600 text-center py-4 text-xs italic">No contacts found in proximity on {frequency} GHz</div>
                      )}
                  </div>
              </div>

@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Message, User, MessageType } from '../types';
 import { mockSql } from '../utils/db';
 
-// We use BroadcastChannel to simulate a local Wi-Fi direct network
-// where all tabs open on the same origin can "see" each other.
-const CHANNEL_NAME = 'ghost_mesh_v1';
+// Base channel name, frequency will be appended
+const BASE_CHANNEL_NAME = 'ghost_mesh_v1';
 
 interface NetworkPacket {
   type: 'HELLO' | 'MESSAGE' | 'ACK' | 'PING_UPDATE';
@@ -12,7 +11,7 @@ interface NetworkPacket {
   sender: User;
 }
 
-export const useMeshNetwork = (currentUser: User) => {
+export const useMeshNetwork = (currentUser: User, frequency: string = '2.412') => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [peers, setPeers] = useState<Map<string, User>>(new Map());
   const [channel, setChannel] = useState<BroadcastChannel | null>(null);
@@ -28,7 +27,12 @@ export const useMeshNetwork = (currentUser: User) => {
     // Initial Load - retrieves encrypted chats from device storage
     syncMessages();
 
-    const bc = new BroadcastChannel(CHANNEL_NAME);
+    // Reset peers when switching frequency
+    setPeers(new Map());
+
+    // Connect to specific frequency channel
+    const channelName = `${BASE_CHANNEL_NAME}_${frequency}`;
+    const bc = new BroadcastChannel(channelName);
     setChannel(bc);
 
     bc.onmessage = (event: MessageEvent) => {
@@ -52,7 +56,7 @@ export const useMeshNetwork = (currentUser: User) => {
       }
     };
 
-    // Announce presence
+    // Announce presence on this new frequency
     bc.postMessage({
       type: 'HELLO',
       payload: {},
@@ -62,7 +66,7 @@ export const useMeshNetwork = (currentUser: User) => {
     return () => {
       bc.close();
     };
-  }, [currentUser, syncMessages]);
+  }, [currentUser, syncMessages, frequency]);
 
   const broadcastMessage = useCallback((content: string, recipientId?: string, type: MessageType = MessageType.TEXT) => {
     const newMessage: Message = {
