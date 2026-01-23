@@ -4,29 +4,22 @@ interface RadarScanProps {
   scanning: boolean;
   onScan: () => void;
   peerCount: number;
-  frequency: string;
-  onFrequencyChange: (newFreq: string) => void;
+  isDarkMode: boolean;
 }
 
-export const RadarScan: React.FC<RadarScanProps> = ({ scanning, onScan, peerCount, frequency, onFrequencyChange }) => {
+export const RadarScan: React.FC<RadarScanProps> = ({ scanning, onScan, peerCount, isDarkMode }) => {
   
-  const adjustFrequency = (direction: 'UP' | 'DOWN') => {
-      const current = parseFloat(frequency);
-      // Standard Wi-Fi channel spacing is 0.005 GHz (5 MHz)
-      const step = 0.005;
-      const next = direction === 'UP' ? current + step : current - step;
-      // Clamp reasonable range (e.g., 2.4GHz band)
-      if (next < 2.400 || next > 2.500) return;
-      
-      onFrequencyChange(next.toFixed(3));
-  };
+  // Theme-based colors
+  const borderColor = isDarkMode ? 'border-slate-700' : 'border-slate-300';
+  const bgColor = isDarkMode ? 'bg-slate-900' : 'bg-white/50 backdrop-blur';
+  const gridColor = isDarkMode ? '#10b981' : '#059669';
 
   return (
-    <div className="relative w-full h-48 bg-slate-900 rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center mb-4">
+    <div className={`relative w-full h-48 ${bgColor} rounded-lg border ${borderColor} overflow-hidden flex items-center justify-center mb-4 transition-colors duration-300`}>
       {/* Grid Lines */}
       <div className="absolute inset-0 z-0 opacity-20" 
            style={{
-             backgroundImage: 'linear-gradient(#10b981 1px, transparent 1px), linear-gradient(90deg, #10b981 1px, transparent 1px)',
+             backgroundImage: `linear-gradient(${gridColor} 1px, transparent 1px), linear-gradient(90deg, ${gridColor} 1px, transparent 1px)`,
              backgroundSize: '20px 20px'
            }}>
       </div>
@@ -43,27 +36,9 @@ export const RadarScan: React.FC<RadarScanProps> = ({ scanning, onScan, peerCoun
       {/* Center Point */}
       <div className="absolute z-20 w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_10px_#10b981]"></div>
 
-      {/* Controls */}
+      {/* Controls / Info */}
       <div className="absolute bottom-3 left-3 z-30 flex flex-col gap-1">
-        <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded border border-slate-700 backdrop-blur-sm">
-            <button 
-                onClick={() => adjustFrequency('DOWN')}
-                className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-emerald-500 text-[10px] rounded"
-            >
-                -
-            </button>
-            <span className="text-[10px] text-emerald-400 font-mono tracking-wider min-w-[70px] text-center">
-             {frequency} GHz
-            </span>
-            <button 
-                onClick={() => adjustFrequency('UP')}
-                className="w-5 h-5 flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-emerald-500 text-[10px] rounded"
-            >
-                +
-            </button>
-        </div>
-        
-        <span className="text-[10px] text-emerald-600 font-mono tracking-wider ml-1">
+        <span className={`text-[10px] ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600 font-bold'} font-mono tracking-wider ml-1`}>
           ACTIVE NODES: {peerCount}
         </span>
       </div>
@@ -71,7 +46,11 @@ export const RadarScan: React.FC<RadarScanProps> = ({ scanning, onScan, peerCoun
       <button 
         onClick={onScan}
         disabled={scanning}
-        className="absolute bottom-3 right-3 z-30 px-3 py-1 bg-emerald-900/50 hover:bg-emerald-800/50 border border-emerald-500/50 text-emerald-400 text-xs font-mono rounded transition-colors"
+        className={`absolute bottom-3 right-3 z-30 px-3 py-1 text-xs font-mono rounded transition-colors border ${
+            isDarkMode 
+            ? 'bg-emerald-900/50 hover:bg-emerald-800/50 border-emerald-500/50 text-emerald-400' 
+            : 'bg-white/80 hover:bg-emerald-50 border-emerald-500 text-emerald-600 font-bold shadow-sm'
+        }`}
       >
         {scanning ? 'SCANNING...' : 'INIT_SCAN'}
       </button>

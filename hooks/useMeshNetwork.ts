@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Message, User, MessageType } from '../types';
 import { mockSql } from '../utils/db';
 
-// Base channel name, frequency will be appended
-const BASE_CHANNEL_NAME = 'ghost_mesh_v1';
+// Single Global Channel
+const CHANNEL_NAME = 'ghost_mesh_v1_global';
 
 interface NetworkPacket {
   type: 'HELLO' | 'MESSAGE' | 'ACK' | 'PING_UPDATE';
@@ -11,7 +11,7 @@ interface NetworkPacket {
   sender: User;
 }
 
-export const useMeshNetwork = (currentUser: User, frequency: string = '2.412') => {
+export const useMeshNetwork = (currentUser: User) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [peers, setPeers] = useState<Map<string, User>>(new Map());
   const [channel, setChannel] = useState<BroadcastChannel | null>(null);
@@ -27,12 +27,8 @@ export const useMeshNetwork = (currentUser: User, frequency: string = '2.412') =
     // Initial Load - retrieves encrypted chats from device storage
     syncMessages();
 
-    // Reset peers when switching frequency
-    setPeers(new Map());
-
-    // Connect to specific frequency channel
-    const channelName = `${BASE_CHANNEL_NAME}_${frequency}`;
-    const bc = new BroadcastChannel(channelName);
+    // Connect to global channel
+    const bc = new BroadcastChannel(CHANNEL_NAME);
     setChannel(bc);
 
     bc.onmessage = (event: MessageEvent) => {
@@ -56,7 +52,7 @@ export const useMeshNetwork = (currentUser: User, frequency: string = '2.412') =
       }
     };
 
-    // Announce presence on this new frequency
+    // Announce presence
     bc.postMessage({
       type: 'HELLO',
       payload: {},
@@ -66,7 +62,7 @@ export const useMeshNetwork = (currentUser: User, frequency: string = '2.412') =
     return () => {
       bc.close();
     };
-  }, [currentUser, syncMessages, frequency]);
+  }, [currentUser, syncMessages]);
 
   const broadcastMessage = useCallback((content: string, recipientId?: string, type: MessageType = MessageType.TEXT) => {
     const newMessage: Message = {
