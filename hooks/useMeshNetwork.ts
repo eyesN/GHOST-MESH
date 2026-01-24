@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Message, User, MessageType } from '../types';
 import { mockSql } from '../utils/db';
 
-// We use BroadcastChannel to simulate a local Wi-Fi direct network
-// where all tabs open on the same origin can "see" each other.
-const CHANNEL_NAME = 'ghost_mesh_v1';
+// Single Global Channel
+const CHANNEL_NAME = 'ghost_mesh_v1_global';
 
 interface NetworkPacket {
   type: 'HELLO' | 'MESSAGE' | 'ACK' | 'PING_UPDATE';
@@ -28,6 +27,7 @@ export const useMeshNetwork = (currentUser: User) => {
     // Initial Load - retrieves encrypted chats from device storage
     syncMessages();
 
+    // Connect to global channel
     const bc = new BroadcastChannel(CHANNEL_NAME);
     setChannel(bc);
 
