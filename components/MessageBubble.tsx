@@ -10,66 +10,57 @@ interface MessageBubbleProps {
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isCurrentUser, senderName, isDarkMode }) => {
   const timeString = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
+
   const isHotspot = message.type === MessageType.HOTSPOT;
 
   // Dynamic styling based on message type
   let bubbleClasses = '';
-  
+
   if (isHotspot) {
-      // Hotspot Message Styles (Amber/Orange)
-      // Keeps Amber accent for both modes but adjusts background for contrast
-      bubbleClasses = isCurrentUser 
-          ? 'bg-amber-600 text-white rounded-tr-sm shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-          : isDarkMode
-            ? 'bg-slate-800 border-2 border-amber-500/50 text-amber-100 rounded-tl-sm shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-            : 'bg-amber-50 border-2 border-amber-500/50 text-amber-900 rounded-tl-sm shadow-sm';
+    // Hotspot Message Styles
+    bubbleClasses = isCurrentUser
+      ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl rounded-tr-sm shadow-md shadow-amber-900/10'
+      : isDarkMode
+        ? 'bg-slate-800 border-l-2 border-amber-500 text-slate-200 rounded-2xl rounded-tl-sm shadow-md'
+        : 'bg-white border-l-2 border-amber-500 text-slate-800 rounded-2xl rounded-tl-sm shadow-lg shadow-slate-200/50';
   } else {
-      // Standard Text Styles
-      if (isCurrentUser) {
-          bubbleClasses = 'bg-emerald-600 text-white rounded-tr-sm shadow-sm';
-      } else {
-          bubbleClasses = isDarkMode 
-            ? 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-sm'
-            : 'bg-white text-slate-800 border border-slate-200 rounded-tl-sm shadow-sm';
-      }
+    // Standard Text Styles
+    if (isCurrentUser) {
+      bubbleClasses = 'bg-emerald-600 text-white rounded-2xl rounded-tr-sm shadow-md shadow-emerald-900/10';
+    } else {
+      bubbleClasses = isDarkMode
+        ? 'bg-slate-800 text-slate-200 rounded-2xl rounded-tl-sm border border-slate-700/50'
+        : 'bg-white text-slate-800 rounded-2xl rounded-tl-sm shadow-sm border border-slate-100';
+    }
   }
 
   return (
-    <div className={`flex flex-col mb-4 ${isCurrentUser ? 'items-end' : 'items-start'}`}>
-      <div className={`max-w-[75%] md:max-w-[60%] flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+    <div className={`flex flex-col mb-6 ${isCurrentUser ? 'items-end' : 'items-start group'}`}>
+      <div className={`max-w-[80%] md:max-w-[65%] flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
         {!isCurrentUser && (
-            <div className="flex items-center gap-2 mb-1 ml-1">
-                <span className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500 font-medium'}`}>{senderName || 'Unknown Signal'}</span>
-                {isHotspot && (
-                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-600 px-1 rounded border border-amber-500/30">HOTSPOT</span>
-                )}
-            </div>
+          <div className="flex items-center gap-2 mb-1.5 ml-1 opacity-70 group-hover:opacity-100 transition-opacity">
+            <span className={`text-[10px] font-bold tracking-wider uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{senderName || 'Unknown Signal'}</span>
+            {isHotspot && (
+              <span className="text-[9px] font-bold bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20 tracking-wider">BEACON</span>
+            )}
+          </div>
         )}
-        
-        <div className={`relative px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-lg transition-all ${bubbleClasses}`}>
-          {/* Hotspot Icon Indicator inside bubble */}
-          {isHotspot && (
-             <div className={`absolute -left-3 -top-3 rounded-full p-1 border border-amber-500/50 ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
-                <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-             </div>
-          )}
+
+        <div className={`relative px-5 py-3.5 text-[0.95rem] leading-relaxed transition-all ${bubbleClasses}`}>
 
           {message.content}
-          
+
           {message.isEncrypted && !isHotspot && (
-            <div className="absolute -right-1 -top-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-sm" title="End-to-End Encrypted"></div>
+            <div className="absolute -right-1 -top-1 w-2 h-2 bg-emerald-400 rounded-full shadow-sm ring-2 ring-slate-900" title="End-to-End Encrypted"></div>
           )}
         </div>
-        
-        <span className={`text-[10px] mt-1 font-mono flex items-center gap-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-          {timeString} 
+
+        <span className={`text-[9px] mt-1.5 mx-1 font-medium tracking-wide flex items-center gap-1.5 opacity-60 ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+          {timeString}
           {isCurrentUser && (
-             <span className={isHotspot ? "text-amber-500" : "text-emerald-500"}>
-                 {isHotspot ? '(( BROADCASTING ))' : '✓✓'}
-             </span>
+            <span className={isHotspot ? "text-amber-500" : "text-emerald-500"}>
+              {isHotspot ? '(( BROADCAST ))' : 'Delivered'}
+            </span>
           )}
         </span>
       </div>
