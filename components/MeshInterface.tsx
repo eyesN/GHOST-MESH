@@ -4,7 +4,6 @@ import { User, Message, MessageType } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { HexButton } from './HexButton';
 import { RadarScan } from './RadarScan';
-import { generateSmartReply } from '../services/geminiService';
 import { mockSql } from '../utils/db';
 
 const BROADCAST_ID = 'BROADCAST';
@@ -94,16 +93,6 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
 
             broadcastMessage(mainInput, recipient, type);
 
-            // AI Mock Trigger for Broadcast
-            if (activeChatId === BROADCAST_ID && mainInput.toLowerCase().includes("@gemini")) {
-                const reply = await generateSmartReply(
-                    messages.filter(m => !m.recipientId).map(m => m.content),
-                    mainInput
-                );
-                setTimeout(() => {
-                    broadcastMessage(`[AI ASSIST]: ${reply}`);
-                }, 1500);
-            }
         }
         setMainInput('');
     };
