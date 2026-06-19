@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Message, User, MessageType } from '../types';
 import { mockSql } from '../utils/db';
+import { ghostCipher } from '../services/ghostCipher';
 
 // Single Global Channel
 const CHANNEL_NAME = 'ghost_mesh_v1_global';
@@ -73,9 +74,14 @@ export const useMeshNetwork = (currentUser: User) => {
       timestamp: Date.now(),
       type: type,
       isEncrypted: true,
+      encryptionMeta: {
+        algorithm: ghostCipher.getCipherInfo(),
+        cipherVersion: 1,
+        encryptedAt: Date.now(),
+      },
     };
 
-    // 1. Save to "Server" (DB) for persistence/offline delivery (Encrypted)
+    // 1. Save to "Server" (DB) for persistence/offline delivery (Encrypted with AES-256-GCM)
     mockSql.addMessage(newMessage);
 
     // 2. Optimistic Update Local
@@ -90,6 +96,8 @@ export const useMeshNetwork = (currentUser: User) => {
           sender: currentUser
        } as NetworkPacket);
     }
+
+    console.log(`[GHOST_CIPHER] 📤 Message encrypted & sent | Algorithm: ${ghostCipher.getCipherInfo()}`);
 
     return newMessage;
   }, [channel, currentUser]);

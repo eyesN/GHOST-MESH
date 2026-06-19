@@ -12,14 +12,16 @@ const SELF_ID = 'SELF_SAFE';
 interface MeshInterfaceProps {
     currentUser: User;
     onLogout: () => void;
+    isDarkMode: boolean;
+    setIsDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initialUser, onLogout }) => {
+export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initialUser, onLogout, isDarkMode, setIsDarkMode }) => {
     // Use local state for user to reflect profile updates immediately
     const [currentUser, setCurrentUser] = useState(initialUser);
 
     // Settings & Theme
-    const [isDarkMode, setIsDarkMode] = useState(true);
+    // const [isDarkMode, setIsDarkMode] = useState(true); // Removed internal state
 
     const { messages, peers, broadcastMessage, scanForPeers } = useMeshNetwork(currentUser);
 
@@ -28,6 +30,7 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
     const [isLocatorOpen, setIsLocatorOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
+
 
     // Hotspot Feature
     const [isHotspotMode, setIsHotspotMode] = useState(false);
@@ -195,31 +198,31 @@ export const MeshInterface: React.FC<MeshInterfaceProps> = ({ currentUser: initi
     // --- Dynamic Theme Classes ---
     // Root Background
     const rootClasses = isDarkMode
-        ? 'bg-slate-900 text-slate-100'
-        : 'bg-slate-50 text-slate-900';
+        ? 'bg-blue-950 text-blue-100' // Darker blue background, light blue text
+        : 'bg-blue-50 text-blue-950'; // Light blue background, darker blue text
 
     // Headers (Translucent)
     const headerClasses = isDarkMode
-        ? 'bg-slate-900/80 border-slate-800/50 backdrop-blur-xl'
-        : 'bg-white/80 border-slate-200/50 backdrop-blur-xl';
+        ? 'bg-blue-950/80 border-blue-900/50 backdrop-blur-xl'
+        : 'bg-white/80 border-blue-200/50 backdrop-blur-xl';
 
     // Text Colors
-    const textPrimary = isDarkMode ? 'text-white' : 'text-slate-900';
-    const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-    const textAccent = isDarkMode ? 'text-emerald-400' : 'text-emerald-600';
+    const textPrimary = isDarkMode ? 'text-white' : 'text-blue-950';
+    const textSecondary = isDarkMode ? 'text-blue-400' : 'text-blue-600';
+    const textAccent = isDarkMode ? 'text-blue-400' : 'text-blue-600'; // Main accent color
 
     // Interactive Elements
-    const inputBg = isDarkMode ? 'bg-slate-800/50 border-transparent placeholder-slate-500 hover:bg-slate-800 transition-colors' : 'bg-white border-slate-200 placeholder-slate-400 shadow-sm hover:border-slate-300 transition-colors';
-    const buttonSecondary = isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-400' : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 shadow-sm';
+    const inputBg = isDarkMode ? 'bg-blue-900/50 border-transparent placeholder-blue-500 hover:bg-blue-900 transition-colors' : 'bg-white border-blue-200 placeholder-blue-400 shadow-sm hover:border-blue-300 transition-colors';
+    const buttonSecondary = isDarkMode ? 'bg-blue-800 hover:bg-blue-700 text-blue-400' : 'bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 shadow-sm';
 
     // List Items
     const listItemBase = isDarkMode
-        ? 'bg-slate-800/30 hover:bg-slate-800 border-slate-800/50'
-        : 'bg-white hover:bg-slate-50 border-slate-100 shadow-sm hover:shadow-md';
+        ? 'bg-blue-800/30 hover:bg-blue-800 border-blue-800/50'
+        : 'bg-white hover:bg-blue-50 border-blue-100 shadow-sm hover:shadow-md';
 
     // Overlays
-    const overlayBg = isDarkMode ? 'bg-slate-900/95' : 'bg-white/95';
-    const cardBg = isDarkMode ? 'bg-slate-800 border-slate-700 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl';
+    const overlayBg = isDarkMode ? 'bg-blue-950/95' : 'bg-white/95';
+    const cardBg = isDarkMode ? 'bg-blue-900 border-blue-800 shadow-2xl' : 'bg-white border-blue-200 shadow-2xl';
 
     const hotspotGlow = isHotspotMode
         ? (isDarkMode ? 'shadow-[inset_0_0_100px_rgba(245,158,11,0.05)]' : 'shadow-[inset_0_0_100px_rgba(245,158,11,0.05)]')

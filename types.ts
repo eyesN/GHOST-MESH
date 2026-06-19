@@ -11,6 +11,17 @@ export enum PeerStatus {
   SCANNING = 'SCANNING'
 }
 
+/**
+ * Encryption metadata attached to each encrypted message.
+ * Allows the UI to display cipher details and verify integrity.
+ */
+export interface EncryptionMeta {
+  algorithm: string;           // e.g. 'AES-256-GCM'
+  fingerprint?: string;        // Sender's key fingerprint
+  cipherVersion: number;       // Cipher engine version
+  encryptedAt: number;         // Timestamp of encryption
+}
+
 export interface User {
   id: string;
   username: string;
@@ -26,6 +37,7 @@ export interface Message {
   timestamp: number;
   type: MessageType;
   isEncrypted: boolean;
+  encryptionMeta?: EncryptionMeta; // Cipher details for encrypted messages
 }
 
 export interface ChatSession {
